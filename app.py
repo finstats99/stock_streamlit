@@ -92,19 +92,19 @@ if confirm_btn:
 
                     st.write("---")
                     # 기존 st.info 부분을 제거하고 아래 코드를 넣으세요.
-                    # st.markdown(
-                    #     """
-                    #     <div style="background-color: #e1f5fe; padding: 15px; border-radius: 5px; border-left: 5px solid #01579b; margin-bottom: 20px;">
-                    #         <span style="color: #01579b; font-weight: bold;">💡 차트 조작법</span><br>
-                    #         <div style="color: #01579b; font-size: 0.9rem; margin-top: 5px; line-height: 1.6;">
-                    #             1. <b>X축 이동:</b> 차트 중앙 클릭 드래그<br>
-                    #             2. <b>X축 기간 조절:</b> 차트 중앙 마우스 휠<br>
-                    #             3. <b>가격/거래량 높이 조절:</b> 양측 숫자(축) 위에서 <b>클릭 드래그</b> 또는 <b>마우스 휠</b>
-                    #         </div>
-                    #     </div>
-                    #     """, 
-                    #     unsafe_allow_html=True
-                    # )
+                    st.markdown(
+                        """
+                        <div style="background-color: #e1f5fe; padding: 15px; border-radius: 5px; border-left: 5px solid #01579b; margin-bottom: 20px;">
+                            <span style="color: #01579b; font-weight: bold;">💡 차트 조작법</span><br>
+                            <div style="color: #01579b; font-size: 0.9rem; margin-top: 5px; line-height: 1.6;">
+                                1. <b>X축 이동:</b> 차트 중앙 클릭 드래그<br>
+                                2. <b>X축 기간 조절:</b> 차트 중앙 마우스 휠<br>
+                                3. <b>가격/거래량 높이 조절:</b> 양측 숫자(축) 위에서 <b>클릭 드래그</b> 또는 <b>마우스 휠</b>
+                            </div>
+                        </div>
+                        """, 
+                        unsafe_allow_html=True
+                    )
                     # 3. Plotly 통합 차트 생성
                     fig = go.Figure()
 
