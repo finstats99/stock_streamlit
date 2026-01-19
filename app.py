@@ -9,6 +9,7 @@ import FinanceDataReader as fdr
 import plotly.graph_objects as go
 
 # --- 함수 정의 ---
+@st.cache_data # 데이터 로딩 속도 향상을 위한 캐시 처리
 def get_krx_company_list() -> pd.DataFrame:
     try:
         url = 'http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13'
@@ -36,13 +37,15 @@ def get_stock_code_by_company(company_name: str) -> str:
 with st.sidebar:
     st.title("📈 주식 분석 프로")
     
-    # 달력 잘림 방지를 위해 날짜 위젯을 최상단에 배치
     today = datetime.datetime.now()
     start_default = datetime.date(2020, 1, 1)
 
+    # 년/월 선택을 쉽게 하려면 min/max_value를 지정하는 것이 좋습니다.
     selected_dates = st.date_input(
         '조회 기간 선택',
         (start_default, today),
+        min_value=datetime.date(1990, 1, 1),
+        max_value=today,
         format="MM.DD.YYYY"
     )
 
@@ -65,78 +68,108 @@ if confirm_btn:
                 # 데이터 수집
                 price_df = fdr.DataReader(stock_code, start_date, end_date)
                 
-            if price_df.empty:
-                st.info("해당 기간의 주가 데이터가 없습니다.")
-            else:
-                            # --- 🕒 조회 시점 출력 코드 추가 시작 ---
-                now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.caption(f"📅 데이터 조회 시점: {now}")
-                # --- 추가 끝 ---
+                if price_df.empty:
+                    st.info("해당 기간의 주가 데이터가 없습니다.")
+                else:
+                    # 🕒 조회 시점 출력
+                    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    st.caption(f"📅 데이터 조회 시점: {now}")
 
-                # 이후 지표 계산 및 시각화 코드 진행...
-                price_df['MA20'] = price_df['Close'].rolling(window=20).mean()
-                # 1. 기술적 지표 계산 (이동평균선)
-                price_df['MA20'] = price_df['Close'].rolling(window=20).mean()
-                price_df['MA60'] = price_df['Close'].rolling(window=60).mean()
-                price_df['MA120'] = price_df['Close'].rolling(window=120).mean()
-                
+                    # 1. 기술적 지표 계산
+                    price_df['MA20'] = price_df['Close'].rolling(window=20).mean()
+                    price_df['MA60'] = price_df['Close'].rolling(window=60).mean()
+                    price_df['MA120'] = price_df['Close'].rolling(window=120).mean()
 
-                # 2. 상단 요약 지표 (Metrics)
-                st.subheader(f"🔍 {company_name} ({stock_code}) 요약")
-                
-                curr_price = int(price_df['Close'].iloc[-1])
-                prev_price = int(price_df['Close'].iloc[-2])
-                change = curr_price - prev_price
-                change_rate = (change / prev_price) * 100
-                
-                m1, m2, m3 = st.columns(3)
-                m1.metric("현재가", f"{curr_price:,} KRW", f"{change:,} ({change_rate:.2f}%)")
-                m2.metric("거래량", f"{int(price_df['Volume'].iloc[-1]):,}")
-                m3.metric("최근 20일 평균", f"{int(price_df['MA20'].iloc[-1]):,} KRW")
-
-                # 3. Plotly 통합 차트 생성
-                fig = go.Figure()
-
-                # 거래량 (보조 Y축 사용, 배경에 회색으로 표시)
-                fig.add_trace(go.Bar(
-                    x=price_df.index, y=price_df['Volume'], 
-                    name='거래량', marker_color='lightgray', 
-                    opacity=0.4, yaxis='y2'
-                ))
-
-                # 주가 및 이동평균선
-                fig.add_trace(go.Scatter(x=price_df.index, y=price_df['Close'], name='종가', line=dict(color='red', width=2)))
-                fig.add_trace(go.Scatter(x=price_df.index, y=price_df['MA20'], name='20일선', line=dict(color='orange', width=1.2)))
-                fig.add_trace(go.Scatter(x=price_df.index, y=price_df['MA60'], name='60일선', line=dict(color='blue', width=1.2)))
-                fig.add_trace(go.Scatter(x=price_df.index, y=price_df['MA120'], name='120일선', line=dict(color='green', width=1.2)))
-
-                # 레이아웃 설정
-                fig.update_layout(
-                    title=f"<b>{company_name}</b> 주가 추이 및 이동평균선",
-                    template="plotly_white",
-                    hovermode="x unified",
-                    yaxis=dict(title="가격 (KRW)", side="left"),
-                    yaxis2=dict(title="거래량", overlaying='y', side='right', showgrid=False),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    margin=dict(l=20, r=20, t=80, b=20)
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-
-                # 4. 데이터프레임 및 다운로드
-                with st.expander("데이터 상세 보기"):
-                    st.dataframe(price_df.sort_index(ascending=False), width="stretch")
+                    # 2. 상단 요약 지표 (Metrics)
+                    st.subheader(f"🔍 {company_name} ({stock_code}) 요약")
                     
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        price_df.to_excel(writer, index=True, sheet_name='Stock_Data')
+                    curr_price = int(price_df['Close'].iloc[-1])
+                    prev_price = int(price_df['Close'].iloc[-2])
+                    change = curr_price - prev_price
+                    change_rate = (change / prev_price) * 100
                     
-                    st.download_button(
-                        label="📥 분석 데이터 엑셀 다운로드",
-                        data=output.getvalue(),
-                        file_name=f"{company_name}_analysis.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("현재가", f"{curr_price:,} KRW", f"{change:,} ({change_rate:.2f}%)")
+                    m2.metric("거래량", f"{int(price_df['Volume'].iloc[-1]):,}")
+                    m3.metric("최근 20일 평균", f"{int(price_df['MA20'].iloc[-1]):,} KRW")
+
+                    # 3. Plotly 통합 차트 생성
+                    fig = go.Figure()
+
+                    # 3-1. 캔들 차트 추가
+                    fig.add_trace(go.Candlestick(
+                        x=price_df.index,
+                        open=price_df['Open'],
+                        high=price_df['High'],
+                        low=price_df['Low'],
+                        close=price_df['Close'],
+                        name='주가'
+                    ))
+
+                    # 3-2. 이동평균선 추가
+                    fig.add_trace(go.Scatter(x=price_df.index, y=price_df['MA20'], name='20일선', line=dict(color='orange', width=1)))
+                    fig.add_trace(go.Scatter(x=price_df.index, y=price_df['MA60'], name='60일선', line=dict(color='blue', width=1)))
+
+                    # 3-3. 거래량 (보조 Y축 사용)
+                    fig.add_trace(go.Bar(
+                        x=price_df.index, y=price_df['Volume'], 
+                        name='거래량', marker_color='lightgray', 
+                        opacity=0.4, yaxis='y2'
+                    ))
+
+                    # 3-4. 레이아웃 설정 (트레이딩뷰 스타일 조작감 반영)
+                    fig.update_layout(
+                        title=f"<b>{company_name}</b> 캔들 분석 차트",
+                        template="plotly_white",
+                        xaxis_rangeslider_visible=False,
+                        hovermode="x unified",
+                        dragmode='pan',
+                        xaxis=dict(
+                            fixedrange=False,
+                            title="날짜"
+                        ),
+                        yaxis=dict(
+                            title="가격 (KRW)",
+                            side="left",
+                            fixedrange=False,
+                            autorange=True
+                        ),
+                        yaxis2=dict(
+                            title="거래량",
+                            overlaying='y',
+                            side='right',
+                            showgrid=False,
+                            fixedrange=False
+                        ),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
+
+                    # 3-5. 차트 출력 (휠 줌 설정 포함)
+                    st.plotly_chart(
+                        fig, 
+                        use_container_width=True, 
+                        config={
+                            'scrollZoom': True,
+                            'displayModeBar': True,
+                            'displaylogo': False,
+                            'modeBarButtonsToRemove': ['select2d', 'lasso2d']
+                        }
+                    )
+
+                    # 4. 데이터프레임 및 다운로드
+                    with st.expander("데이터 상세 보기"):
+                        st.dataframe(price_df.sort_index(ascending=False), use_container_width=True)
+                        
+                        output = BytesIO()
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                            price_df.to_excel(writer, index=True, sheet_name='Stock_Data')
+                        
+                        st.download_button(
+                            label="📥 분석 데이터 엑셀 다운로드",
+                            data=output.getvalue(),
+                            file_name=f"{company_name}_analysis.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
 
         except Exception as e:
             st.error(f"오류가 발생했습니다: {e}")
